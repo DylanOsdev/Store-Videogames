@@ -1,0 +1,9 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CheckoutView from "../components/CheckoutView.tsx";
+---
+
+<Layout title="Checkout — GameStore">
+  <h1 style="font-size:1.8rem; margin:0 0 1.5rem;">Finalizar compra</h1>
+  <CheckoutView client:only="react" />
+</Layout>
