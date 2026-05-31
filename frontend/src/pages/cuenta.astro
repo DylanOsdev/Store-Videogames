@@ -1,0 +1,12 @@
+---
+import Layout from "../layouts/Layout.astro";
+import AuthForm from "../components/AuthForm.tsx";
+import AccountView from "../components/AccountView.tsx";
+---
+
+<Layout title="Mi cuenta — GameStore">
+  <h1 style="font-size:1.8rem; margin:0 0 1.5rem;">Mi cuenta</h1>
+  <!-- Ambas islas leen el store de sesión; solo una se muestra según haya login -->
+  <AuthForm client:only="react" />
+  <AccountView client:only="react" />
+</Layout>

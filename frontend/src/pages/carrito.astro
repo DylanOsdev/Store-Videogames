@@ -1,0 +1,9 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CartView from "../components/CartView.tsx";
+---
+
+<Layout title="Carrito — GameStore">
+  <h1 style="font-size:1.8rem; margin:0 0 1.5rem;">Tu carrito</h1>
+  <CartView client:only="react" />
+</Layout>

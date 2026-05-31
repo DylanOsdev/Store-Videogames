@@ -1,0 +1,136 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ProductCard from "../components/ProductCard.astro";
+import { API_BASE } from "../lib/config";
+import type { Paginated, Product, Category, Platform } from "../lib/types";
+
+// SSR: esta página se renderiza en el servidor para que el catálogo sea
+// indexable por Google con datos vivos.
+export const prerender = false;
+
+// Lee filtros desde la query string.
+const url = Astro.url;
+const params = new URLSearchParams();
+for (const key of ["platform", "category", "search", "ordering", "min_price", "max_price"]) {
+  const val = url.searchParams.get(key);
+  if (val) params.set(key, val);
+}
+
+let products: Product[] = [];
+let categories: Category[] = [];
+let platforms: Platform[] = [];
+let apiError = false;
+
+// Fetch en el servidor. Si Django no responde, degradamos a estado vacío.
+try {
+  const [prodRes, catRes, platRes] = await Promise.all([
+    fetch(`${API_BASE}/catalog/products/?${params.toString()}`),
+    fetch(`${API_BASE}/catalog/categories/`),
+    fetch(`${API_BASE}/catalog/platforms/`),
+  ]);
+  if (prodRes.ok) {
+    const data = (await prodRes.json()) as Paginated<Product>;
+    products = data.results ?? [];
+  }
+  if (catRes.ok) {
+    const data = (await catRes.json()) as Paginated<Category> | Category[];
+    categories = Array.isArray(data) ? data : data.results ?? [];
+  }
+  if (platRes.ok) {
+    const data = (await platRes.json()) as Paginated<Platform> | Platform[];
+    platforms = Array.isArray(data) ? data : data.results ?? [];
+  }
+} catch {
+  apiError = true;
+}
+
+const selectedPlatform = url.searchParams.get("platform") ?? "";
+const selectedCategory = url.searchParams.get("category") ?? "";
+const searchTerm = url.searchParams.get("search") ?? "";
+---
+
+<Layout title="Catálogo de videojuegos — GameStore">
+  <header style="margin-bottom:2rem;">
+    <h1 style="font-size:2rem; margin:0 0 0.5rem;">Catálogo</h1>
+    <p class="muted" style="margin:0;">
+      Videojuegos y claves digitales con entrega inmediata.
+    </p>
+  </header>
+
+  <form
+    method="get"
+    style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:2rem; align-items:flex-end;"
+  >
+    <div style="flex:1; min-width:200px;">
+      <label class="muted" style="font-size:0.8rem;">Buscar</label>
+      <input
+        class="input"
+        type="search"
+        name="search"
+        placeholder="Nombre del juego…"
+        value={searchTerm}
+      />
+    </div>
+    <div style="min-width:160px;">
+      <label class="muted" style="font-size:0.8rem;">Plataforma</label>
+      <select class="select" name="platform">
+        <option value="">Todas</option>
+        {
+          platforms.map((p) => (
+            <option value={p.slug} selected={p.slug === selectedPlatform}>
+              {p.name}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+    <div style="min-width:160px;">
+      <label class="muted" style="font-size:0.8rem;">Categoría</label>
+      <select class="select" name="category">
+        <option value="">Todas</option>
+        {
+          categories.map((c) => (
+            <option value={c.slug} selected={c.slug === selectedCategory}>
+              {c.name}
+            </option>
+          ))
+        }
+      </select>
+    </div>
+    <button type="submit" class="btn">Filtrar</button>
+  </form>
+
+  {
+    apiError && (
+      <div class="card" style="padding:1.25rem; border-color:var(--danger);">
+        <strong>No se pudo conectar con la API.</strong>
+        <p class="muted" style="margin:0.5rem 0 0;">
+          Verifica que el backend Django esté corriendo en {API_BASE}.
+        </p>
+      </div>
+    )
+  }
+
+  {
+    !apiError && products.length === 0 && (
+      <div class="card" style="padding:2rem; text-align:center;">
+        <p class="muted" style="margin:0;">
+          No hay productos que coincidan. Agrega algunos desde el panel de
+          administración de Django.
+        </p>
+      </div>
+    )
+  }
+
+  {
+    products.length > 0 && (
+      <div
+        style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:1.25rem;"
+      >
+        {products.map((p) => (
+          <ProductCard product={p} />
+        ))}
+      </div>
+    )
+  }
+</Layout>
