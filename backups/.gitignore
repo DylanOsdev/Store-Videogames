@@ -1,0 +1,6 @@
+# Los dumps de la base de datos NUNCA se versionan (datos reales: pedidos,
+# usuarios, entregas). Este directorio existe solo como destino de los scripts.
+*.dump
+*.sql
+*.log
+!.gitignore
