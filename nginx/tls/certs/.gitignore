@@ -1,0 +1,6 @@
+# Los certificados TLS NUNCA se versionan (claves privadas y certs).
+# Coloca aquí fullchain.pem y privkey.pem (Let's Encrypt o autofirmados).
+*.pem
+*.crt
+*.key
+!.gitignore

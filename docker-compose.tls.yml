@@ -1,0 +1,33 @@
+# ===========================================================================
+# Override de TLS para el stack de producción (opt-in).
+#
+# El stack base (docker-compose.prod.yml) sirve HTTP en el puerto 80. Este
+# override añade terminación TLS SIN modificar el flujo por defecto:
+#
+#   1. Genera certificados (local de prueba):
+#        ./nginx/tls/generate-selfsigned.sh
+#      o coloca los de Let's Encrypt en ./nginx/tls/certs/ como
+#      fullchain.pem y privkey.pem (ver DEPLOY.md).
+#
+#   2. Levanta el stack con AMBOS archivos:
+#        docker compose --env-file .env.prod \
+#          -f docker-compose.prod.yml -f docker-compose.tls.yml up -d
+#
+# Cómo funciona el reemplazo de config:
+#   - El base monta ./nginx/conf.d como directorio en /etc/nginx/conf.d.
+#   - Aquí montamos app-tls.conf ENCIMA de /etc/nginx/conf.d/app.conf. Docker
+#     monta primero el directorio (ruta más corta) y luego el archivo encima,
+#     así que la versión TLS reemplaza a la HTTP sin dejar server blocks
+#     duplicados en el puerto 80.
+# ===========================================================================
+
+services:
+  nginx:
+    ports:
+      # El base ya publica el 80; aquí añadimos el 443.
+      - "443:443"
+    volumes:
+      # Reemplaza la config HTTP por la TLS (montaje anidado sobre app.conf).
+      - ./nginx/tls/app-tls.conf:/etc/nginx/conf.d/app.conf:ro
+      # Certificados (fullchain.pem + privkey.pem) en solo-lectura.
+      - ./nginx/tls/certs:/etc/nginx/certs:ro
