@@ -15,6 +15,11 @@
 #   3. docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 # ===========================================================================
 
+# Nombre de proyecto propio para AISLAR este stack (producción) del de
+# desarrollo. El override docker-compose.tls.yml hereda este nombre (no define
+# 'name'), así que TLS sigue operando sobre el mismo proyecto de producción.
+name: videojuegos-prod
+
 services:
   db:
     image: postgres:16-alpine
