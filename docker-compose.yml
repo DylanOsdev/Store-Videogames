@@ -1,3 +1,9 @@
+# Nombre de proyecto propio para AISLAR este stack (desarrollo) del de
+# producción. Sin esto, ambos comparten proyecto (el directorio) y como usan
+# los mismos nombres de servicio, un 'up' de uno recrea los contenedores del
+# otro. Con 'name' distinto, cada stack tiene su red, volúmenes y contenedores.
+name: videojuegos-dev
+
 services:
   db:
     image: postgres:16-alpine
