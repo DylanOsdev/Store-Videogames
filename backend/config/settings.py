@@ -144,6 +144,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": os.environ.get("THROTTLE_LOGIN", "10/min"),
         "register": os.environ.get("THROTTLE_REGISTER", "5/min"),
+        "password_reset": os.environ.get("THROTTLE_PASSWORD_RESET", "5/min"),
         "checkout": os.environ.get("THROTTLE_CHECKOUT", "30/min"),
         "webhook": os.environ.get("THROTTLE_WEBHOOK", "120/min"),
     },
@@ -178,6 +179,19 @@ SIMPLE_JWT = {
 # --- CORS (frontend Astro) ---------------------------------------------------
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:4321,http://127.0.0.1:4321"
+)
+
+
+# --- Frontend ----------------------------------------------------------------
+# URL pública del frontend, usada para construir enlaces que se envían por
+# correo (p.ej. el de restablecer contraseña). En producción detrás de nginx
+# el front y la API comparten origen, así que apunta al dominio público.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:4321")
+
+# Caducidad del enlace de restablecimiento de contraseña, en segundos.
+# default_token_generator usa este valor para invalidar tokens vencidos.
+PASSWORD_RESET_TIMEOUT = int(
+    os.environ.get("PASSWORD_RESET_TIMEOUT", str(60 * 60 * 2))  # 2 horas
 )
 
 

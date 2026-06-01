@@ -112,6 +112,16 @@ export default function AuthForm() {
               ? "Ingresar"
               : "Crear cuenta"}
         </button>
+
+        {mode === "login" && (
+          <a
+            href="/recuperar/"
+            className="muted"
+            style={{ fontSize: "0.85rem", textAlign: "center" }}
+          >
+            ¿Olvidaste tu contraseña?
+          </a>
+        )}
       </form>
     </div>
   );

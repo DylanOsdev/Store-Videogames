@@ -26,7 +26,13 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-from accounts.views import LoginView, MeView, RegisterView
+from accounts.views import (
+    LoginView,
+    MeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    RegisterView,
+)
 from catalog.views import CategoryViewSet, PlatformViewSet, ProductViewSet
 from orders.views import CheckoutView, OrderViewSet
 from payments.views import PaymentInitView, PaymentStatusView, WompiWebhookView
@@ -43,6 +49,16 @@ auth_patterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("me/", MeView.as_view(), name="me"),
+    path(
+        "password/reset/",
+        PasswordResetRequestView.as_view(),
+        name="password-reset",
+    ),
+    path(
+        "password/reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="password-reset-confirm",
+    ),
 ]
 
 api_patterns = [

@@ -64,3 +64,23 @@ export function logout() {
   clearTokens();
   currentUser.set(null);
 }
+
+export async function requestPasswordReset(email: string): Promise<string> {
+  // El backend responde igual exista o no la cuenta (anti-enumeración).
+  const res = await api.post<{ detail: string }>("/auth/password/reset/", {
+    email,
+  });
+  return res.detail;
+}
+
+export async function confirmPasswordReset(
+  uid: string,
+  token: string,
+  newPassword: string
+): Promise<string> {
+  const res = await api.post<{ detail: string }>(
+    "/auth/password/reset/confirm/",
+    { uid, token, new_password: newPassword }
+  );
+  return res.detail;
+}

@@ -1,0 +1,11 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PasswordResetConfirmForm from "../components/PasswordResetConfirmForm.tsx";
+---
+
+<Layout title="Restablecer contraseña — GameStore">
+  <h1 style="font-size:1.8rem; margin:0 0 1.5rem; text-align:center;">
+    Restablecer contraseña
+  </h1>
+  <PasswordResetConfirmForm client:only="react" />
+</Layout>
