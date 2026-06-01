@@ -1,0 +1,39 @@
+# Lo que NUNCA debe entrar a la imagen del backend.
+# Evita filtrar secretos (.env), inflar la imagen (.venv) y copiar basura.
+
+# Entorno virtual local (tiene rutas absolutas del host; se reinstala en build)
+.venv/
+venv/
+env/
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Caches de Python
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Estáticos/media generados (se regeneran con collectstatic en el arranque)
+staticfiles/
+media/
+
+# Bases de datos locales
+*.sqlite3
+db.sqlite3
+
+# Git / IDE / SO
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Docs y logs sueltos
+*.log

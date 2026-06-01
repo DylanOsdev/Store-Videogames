@@ -1,0 +1,78 @@
+# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# Imagen de PRODUCCIÓN del backend Django.
+#
+# Diferencias clave con el Dockerfile de desarrollo:
+#   - Sirve con gunicorn (WSGI), no con runserver.
+#   - Multi-stage: las wheels se compilan en una etapa y solo se copian al
+#     runtime, dejando la imagen final más liviana.
+#   - Corre como usuario sin privilegios (no root).
+#   - El entrypoint aplica migraciones y recolecta estáticos al arrancar.
+# ---------------------------------------------------------------------------
+
+# --- Etapa 1: builder — instala dependencias en un venv aislado --------------
+FROM python:3.14-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Herramientas de compilación por si alguna dependencia necesita build.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# venv autocontenido que luego copiamos tal cual al runtime.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# --- Etapa 2: runtime — imagen final mínima ----------------------------------
+FROM python:3.14-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    DJANGO_DEBUG=False
+
+WORKDIR /app
+
+# Solo la librería de runtime de PostgreSQL (no el -dev de compilación).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Usuario sin privilegios para correr la app.
+RUN groupadd --system app && useradd --system --gid app --home /app app
+
+# Copiamos el venv ya construido y el código.
+COPY --from=builder /opt/venv /opt/venv
+COPY . .
+
+# Carpetas de estáticos/media propiedad del usuario app.
+RUN mkdir -p /app/staticfiles /app/media && \
+    chown -R app:app /app
+
+COPY --chown=app:app entrypoint.prod.sh /entrypoint.prod.sh
+RUN chmod +x /entrypoint.prod.sh
+
+USER app
+
+EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.prod.sh"]
+
+# gunicorn: 3 workers por defecto (ajusta WEB_CONCURRENCY según CPU del host),
+# timeout amplio para tareas de checkout y bind a todas las interfaces.
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "3", \
+     "--timeout", "60", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]
