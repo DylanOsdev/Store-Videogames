@@ -91,3 +91,24 @@ class CheckoutAPITests(APITestCase):
         resp = self.client.get("/api/orders/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["count"], 0)  # no ve el del otro
+
+    def test_usuario_no_puede_ver_detalle_de_pedido_ajeno(self):
+        """El detalle por id de un pedido ajeno devuelve 404 (no 403): el
+        queryset se filtra por request.user, así que el pedido no existe para
+        este usuario. Blinda la garantía de autorización en el detalle."""
+        otro = User.objects.create_user(email="otro@test.com", password="OtraClave123")
+        pedido_ajeno = Order.objects.create(user=otro, contact_email="otro@test.com")
+        self._auth()
+        resp = self.client.get(f"/api/orders/{pedido_ajeno.id}/")
+        self.assertEqual(resp.status_code, 404)
+        # El propio dueño sí puede verlo (control positivo).
+        self.client.credentials()
+        login = self.client.post(
+            "/api/auth/login/",
+            {"email": "otro@test.com", "password": "OtraClave123"},
+            format="json",
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+        propio = self.client.get(f"/api/orders/{pedido_ajeno.id}/")
+        self.assertEqual(propio.status_code, 200)
+        self.assertEqual(propio.data["id"], pedido_ajeno.id)
