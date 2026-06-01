@@ -214,7 +214,13 @@ EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+# TLS (STARTTLS, típico en el puerto 587) y SSL (conexión cifrada directa,
+# puerto 465) son EXCLUYENTES: Django lanza un error si se activan ambos.
+# Por eso, si se pide SSL, desactivamos TLS de forma explícita.
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True) and not EMAIL_USE_SSL
+# Evita que una conexión SMTP colgada bloquee la petición o el worker.
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get(
     "DEFAULT_FROM_EMAIL", "GameStore <no-reply@gamestore.local>"
 )
