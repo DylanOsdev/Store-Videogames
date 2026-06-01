@@ -89,6 +89,57 @@ backend por la red interna de Docker (`http://backend:8000`).
 - Parar y borrar datos (¡destruye la BD!):
   `docker compose -f docker-compose.prod.yml down -v`
 
+## Backups de la base de datos
+
+El volumen `pgdata_prod` guarda todo (pedidos, usuarios, entregas). Respáldalo
+con regularidad: un fallo de disco o un `down -v` accidental lo borra.
+
+### Crear un backup
+
+```
+./scripts/backup-db.sh
+```
+
+Genera `backups/db_<timestamp>.dump` (formato custom comprimido de `pg_dump`),
+lo valida con `pg_restore --list` y conserva los últimos 7 (variable
+`RETENTION`). Los `.dump` están en `.gitignore`: nunca se versionan.
+
+Variables opcionales: `DB_CONTAINER` (def. `videojuegos_db_prod`),
+`BACKUP_DIR`, `RETENTION`.
+
+### Programar a diario (cron)
+
+```
+0 3 * * * cd /ruta/al/repo && ./scripts/backup-db.sh >> backups/cron.log 2>&1
+```
+
+> En serio: lleva los dumps a otra máquina o almacenamiento externo (S3, etc.).
+> Un backup en el mismo disco que la BD no protege ante fallo de disco.
+
+### Restaurar (DESTRUCTIVO sobre la BD viva)
+
+```
+./scripts/restore-db.sh backups/db_<timestamp>.dump
+```
+
+Pide confirmación (escribe `restaurar`) porque sobrescribe los datos actuales.
+Para entornos no interactivos: `FORCE=1 ./scripts/restore-db.sh <archivo>`.
+
+### Probar un backup SIN tocar producción
+
+Restaura en una base temporal y verifícala; así confirmas que el dump es
+completo y restaurable sin riesgo para la BD viva:
+
+```
+DUMP=backups/db_<timestamp>.dump
+docker exec videojuegos_db_prod sh -c 'createdb -U "$POSTGRES_USER" prueba_restore'
+docker exec -i videojuegos_db_prod sh -c \
+  'pg_restore --no-owner -U "$POSTGRES_USER" -d prueba_restore' < "$DUMP"
+docker exec videojuegos_db_prod sh -c \
+  'psql -U "$POSTGRES_USER" -d prueba_restore -tAc "SELECT count(*) FROM catalog_product;"'
+docker exec videojuegos_db_prod sh -c 'dropdb -U "$POSTGRES_USER" prueba_restore'
+```
+
 ## HTTPS
 
 El stack base sirve por HTTP en el puerto 80. TLS es **opt-in**: se activa con
