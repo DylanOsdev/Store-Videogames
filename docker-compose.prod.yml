@@ -1,0 +1,146 @@
+# ===========================================================================
+# Stack de PRODUCCIÓN.
+#
+# Diferencias con docker-compose.yml (desarrollo):
+#   - Backend servido con gunicorn (no runserver), imagen multi-stage non-root.
+#   - Frontend Astro compilado y servido por su servidor Node standalone.
+#   - nginx como único punto de entrada (reverse proxy + estáticos/media).
+#   - Solo nginx expone puerto al host; db/redis/backend/frontend quedan en la
+#     red interna de Docker (no accesibles desde fuera).
+#   - Volúmenes compartidos para estáticos y media entre backend y nginx.
+#
+# Uso:
+#   1. Copia backend/.env.prod.example -> backend/.env.prod y complétalo.
+#   2. Copia .env.prod.example -> .env.prod (variables de build del frontend).
+#   3. docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+# ===========================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: videojuegos_db_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-videojuegos}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    # Sin 'ports': la BD NO se expone al host en producción.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-videojuegos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: videojuegos_redis_prod
+    restart: unless-stopped
+    # Sin 'ports': Redis solo accesible internamente.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    image: videojuegos-backend:prod
+    container_name: videojuegos_backend_prod
+    restart: unless-stopped
+    # El entrypoint espera a la BD, migra y recolecta estáticos; luego gunicorn.
+    environment:
+      POSTGRES_HOST: db
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    env_file:
+      - ./backend/.env.prod
+    volumes:
+      # Compartidos con nginx para que sirva /static/ y /media/ directamente.
+      - static_prod:/app/staticfiles
+      - media_prod:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health/').status==200 else sys.exit(1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    image: videojuegos-backend:prod
+    container_name: videojuegos_worker_prod
+    restart: unless-stopped
+    # Salta el entrypoint de prod: NO debe migrar ni collectstatic (eso lo hace
+    # el backend). Solo arranca el worker de Celery.
+    entrypoint: ["celery", "-A", "config", "worker", "-l", "info"]
+    environment:
+      POSTGRES_HOST: db
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    env_file:
+      - ./backend/.env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # Variables PUBLIC_* horneadas en el bundle del navegador EN BUILD.
+      args:
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+        PUBLIC_WOMPI_PUBLIC_KEY: ${PUBLIC_WOMPI_PUBLIC_KEY:-}
+        PUBLIC_WOMPI_WIDGET_URL: ${PUBLIC_WOMPI_WIDGET_URL:-https://checkout.wompi.co/widget.js}
+    image: videojuegos-frontend:prod
+    container_name: videojuegos_frontend_prod
+    restart: unless-stopped
+    environment:
+      # URL interna para los fetch SSR (servidor Astro -> backend por la red).
+      INTERNAL_API_URL: http://backend:8000
+      HOST: 0.0.0.0
+      PORT: "4321"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4321/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: videojuegos_nginx_prod
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # Estáticos y media en solo-lectura (los escribe el backend).
+      - static_prod:/vol/static:ro
+      - media_prod:/vol/media:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  pgdata_prod:
+  static_prod:
+  media_prod:

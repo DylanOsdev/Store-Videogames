@@ -8,7 +8,9 @@ db.sqlite3
 # === Secretos y entorno ===
 .env
 .env.*
-!.env.example
+# Las plantillas de ejemplo SÍ se versionan (incluye .env.example,
+# .env.prod.example, etc.). La excepción cubre cualquier *.example.
+!*.example
 
 # === Media subida por usuarios ===
 media/

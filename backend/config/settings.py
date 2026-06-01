@@ -65,6 +65,10 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise sirve los estáticos directamente desde el proceso WSGI.
+    # Va justo después de SecurityMiddleware (recomendación oficial). En prod,
+    # nginx intercepta /static/ antes, así que esto actúa de respaldo robusto.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -214,6 +218,23 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Backend de almacenamiento de estáticos. En producción usamos WhiteNoise con
+# manifiesto + compresión: hashea los nombres de archivo (cache-busting) y sirve
+# versiones .gz/.br precomprimidas. En dev dejamos el backend por defecto para
+# no tener que ejecutar collectstatic en cada cambio.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        ),
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
